@@ -1,0 +1,141 @@
+"use client";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
+
+// Função para buscar no Google Sheets
+async function fetchSheetData(sheetName) {
+  const sheetId = "1d4D5z1yqP-czQSC_jSPIRjU1kOhSa_0kP9eVhYbiOfQ"; // substitua pelo seu
+  const apiKey = "SUA_API_KEY"; // substitua pela sua
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}?key=${apiKey}`;
+
+  const response = await fetch(url);
+  const data = await response.json();
+  return data.values || [];
+}
+
+export default function HubDeConsultas() {
+  const [activeTab, setActiveTab] = useState("aba1");
+  const [searchTermCNAE, setSearchTermCNAE] = useState("");
+  const [searchTermEstado, setSearchTermEstado] = useState("");
+  const [dataAba1, setDataAba1] = useState([]);
+  const [dataAba2, setDataAba2] = useState([]);
+
+  useEffect(() => {
+    fetchSheetData("Aba1").then(setDataAba1);
+    fetchSheetData("Aba2").then(setDataAba2);
+  }, []);
+
+  // Função para busca de múltiplos CNAEs
+  const normalizeSearchTerms = (input) => {
+    return input
+      .split(/[\s,;]+/) // divide por espaço, vírgula ou ponto e vírgula
+      .map((term) => term.trim().toLowerCase())
+      .filter((term) => term.length > 0);
+  };
+
+  const filteredAba1 = dataAba1.filter((row) =>
+    row.some((cell) =>
+      cell?.toLowerCase().includes(searchTermCNAE.toLowerCase())
+    )
+  );
+
+  const filteredAba2CNAE = dataAba2.filter((row) => {
+    const terms = normalizeSearchTerms(searchTermCNAE);
+    return terms.some((term) => row[0]?.toLowerCase().includes(term)); // coluna 0 = CNAE
+  });
+
+  const filteredAba2Estado = dataAba2.filter((row) =>
+    row[1]?.toLowerCase().includes(searchTermEstado.toLowerCase()) // coluna 1 = Estado
+  );
+
+  const cardStyle = "bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-2xl shadow-md";
+
+  return (
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-4 text-center text-purple-700">Hub de Consultas</h1>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="flex justify-center mb-6">
+          <TabsTrigger value="aba1">Consulta Simples</TabsTrigger>
+          <TabsTrigger value="aba2">Consulta CNAE / Estado</TabsTrigger>
+        </TabsList>
+
+        {/* Aba 1 */}
+        <TabsContent value="aba1">
+          <Input
+            placeholder="Pesquisar..."
+            value={searchTermCNAE}
+            onChange={(e) => setSearchTermCNAE(e.target.value)}
+            className="mb-4"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredAba1.map((row, idx) => (
+              <motion.div key={idx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <Card className={cardStyle}>
+                  <CardContent>
+                    {row.map((cell, i) => (
+                      <p key={i} className="mb-2">{cell}</p>
+                    ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Aba 2 */}
+        <TabsContent value="aba2">
+          <div className="flex gap-2 mb-4">
+            <Input
+              placeholder="Pesquisar CNAE..."
+              value={searchTermCNAE}
+              onChange={(e) => setSearchTermCNAE(e.target.value)}
+            />
+            <Input
+              placeholder="Pesquisar Estado..."
+              value={searchTermEstado}
+              onChange={(e) => setSearchTermEstado(e.target.value)}
+            />
+          </div>
+
+          {/* Resultados CNAE */}
+          {searchTermCNAE && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {filteredAba2CNAE.map((row, idx) => (
+                <motion.div key={idx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <Card className={cardStyle}>
+                    <CardContent>
+                      <p className="font-bold">CNAE: {row[0]}</p>
+                      <p>Estado: {row[1]}</p>
+                      <p>Procedimento: {row[2]}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Resultados Estado */}
+          {searchTermEstado && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredAba2Estado.map((row, idx) => (
+                <motion.div key={idx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <Card className={cardStyle}>
+                    <CardContent>
+                      <p className="font-bold">Estado: {row[1]}</p>
+                      <p>CNAE: {row[0]}</p>
+                      <p>Procedimento: {row[2]}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
